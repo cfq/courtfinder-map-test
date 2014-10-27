@@ -7,3 +7,19 @@
     right: 0;
     bottom: 0;
 }
+
+#court-list-box {
+  background: white;
+  box-shadow: 1px 1px 1px rgba(0, 0, 0, .5);
+  position: absolute;
+  z-index: 10;
+  top: 10px;
+  left: 80px;
+  width: 480px;
+  height: 21px;
+  padding: 0.3em;
+
+  #court-list {
+    width: 100%;
+  }
+}
