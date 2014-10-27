@@ -3,10 +3,13 @@ import pprint
 import re
 import time
 
+from pymongo import MongoClient
 import requests
 import shapefile
 
 pp = pprint.PrettyPrinter(indent=4)
+
+db = MongoClient().postcodes
 
 def main():
     with open('compiled-courts.json', 'r') as fhandle:
@@ -16,16 +19,43 @@ def main():
     out_obj = []
 
     for courtname, court in courts.iteritems():
-        if 'lat' in court and court['lat'] is not False:
+        is_bankruptcy = ('Bankruptcy' in [aol_obj['name'] for aol_obj in court['data']['areas_of_law']])
+        has_postcodes = 'postcodes' in court['data']
+
+        print courtname
+        if has_postcodes and is_bankruptcy:
+            postcodes = match_postcodes( court['data']['postcodes'] )
+
             out_obj.append({
                 "name": courtname,
-                "lat": court['lat'],
-                "lon": court['lon']    
+                "postcodes": postcodes
             })
 
-    with open('court-lat-lon.json', 'w') as fhandle:
+    with open('court-lat-lon-postcode.json', 'w') as fhandle:
         json.dump(out_obj, fhandle, indent=4, separators=(',', ': '))
         fhandle.close()
+
+
+def match_postcodes( postcodes ):
+    out = []
+    for postcode in postcodes:
+        print "-->", postcode
+        cache_hit = db.mapit_response_cache.find({ "postcode": postcode.lower().replace(' ', '') })
+        if cache_hit.count() > 0:
+            cache_hit = cache_hit.next()
+            if "error" in cache_hit['response']:
+                out.append({ "postcode": postcode, "lat": None, "lon": None })
+            else:
+                out.append({
+                    "postcode": postcode,
+                    "lat": cache_hit['response']['wgs84_lat'],
+                    "lon": cache_hit['response']['wgs84_lon']
+                })
+        else:
+            out.append({ "postcode": postcode, "lat": None, "lon": None })
+
+    return out
+
 
 
 def add_lat_lons():
@@ -70,7 +100,7 @@ def mapit( postcode ):
         else:
             print r.text
             return False
-            
+
 
 
 def get_court_postcodes():
@@ -79,7 +109,7 @@ def get_court_postcodes():
     with open('search-courts.json', 'r') as fhandle:
         cfile = json.load(fhandle)
         fhandle.close()
-    
+
     all_keys = set()
     for court in cfile:
         visiting = [address for address in court['addresses'] if address['type'] == 'Visiting']
