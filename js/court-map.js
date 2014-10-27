@@ -2,6 +2,7 @@ var map = undefined;
 var markers = [];
 var infowindows = [];
 var postcodeMap = {};
+var currentCourt = undefined;
 
 $(function (){
     initialise_for_postcodes();
@@ -40,7 +41,9 @@ var initialiseCourtList = function(){
                 $('#court-list').data('placeholder-removed', true);
             }
 
-            var postcodes = postcodeMap[$('#court-list').val()];
+            currentCourt = $('#court-list').val();
+
+            var postcodes = postcodeMap[currentCourt];
 
             clearMarkers();
 
@@ -48,7 +51,7 @@ var initialiseCourtList = function(){
             var failed = _.pluck( _.filter(postcodes, function ( x ){ return x.lat == null }), 'postcode');
 
             _.map(geocoded, plotPostcode);
-            postcodesio(failed);
+            postcodesio(failed, currentCourt);
         });
     });
 }
@@ -58,16 +61,25 @@ var plotPostcode = function ( postcode ){
     recentreMap();
 }
 
-var postcodesio = function ( postcodes ){
+var postcodesio = function ( postcodes, courtname ){
     if( postcodes.length == 0 )
         return false;
 
     for( var i in postcodes ){
+        if( courtname != currentCourt )
+            return false;
+
         $.getJSON('https://api.postcodes.io/postcodes/' + postcodes[i] + '/autocomplete?limit=100', function ( autocomplete_response ){
             if( !('result' in autocomplete_response) || autocomplete_response.result == null || autocomplete_response.result.length == 0 )
                 return false;
 
+            if( courtname != currentCourt )
+                return false;
+
             $.post( 'https://api.postcodes.io/postcodes', { postcodes: autocomplete_response.result }, function ( data ){
+                if( courtname != currentCourt )
+                    return false;
+
                 pobjs = _.map(data.result, function (x){ return { lat: x.result.latitude, lon: x.result.longitude, postcode: x.query } });
                 _.map( pobjs, plotPostcode );
             });
